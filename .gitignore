@@ -1,0 +1,8 @@
+.env
+__pycache__/
+*.pyc
+logs/
+api_logs/
+telegram_offset.json
+applications.json
+ManojNanjundaswamy-apr2025.pdf
