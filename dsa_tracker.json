@@ -4,9 +4,9 @@
     "total_problems_in_roadmap": 175,
     "current_week": 1,
     "current_pattern": "Arrays & Hashing",
-    "streak_days": 0,
-    "total_problems_solved": 0,
-    "last_updated": "2026-05-08T21:43:28.519183"
+    "streak_days": 1,
+    "total_problems_solved": 3,
+    "last_updated": "2026-05-09"
   },
   "problems": [
     {
@@ -16,11 +16,11 @@
       "leetcode_number": 217,
       "pattern": "Arrays & Hashing",
       "difficulty": "Easy",
-      "interval_days": 3,
-      "ease_factor": 2.6,
-      "last_reviewed": "2026-05-08T21:43:28.523170",
-      "next_due": "2026-05-11T21:43:28.523170",
-      "times_reviewed": 1,
+      "interval_days": 17,
+      "ease_factor": 2.5,
+      "last_reviewed": "2026-05-09",
+      "next_due": "2026-05-26",
+      "times_reviewed": 3,
       "status": "active",
       "streak_days": 0
     },
@@ -36,7 +36,7 @@
       "last_reviewed": "2026-05-08T21:43:28.548851",
       "next_due": "2026-05-09T21:43:28.548851",
       "times_reviewed": 1,
-      "status": "active",
+      "status": "new",
       "streak_days": 0
     },
     {
@@ -51,7 +51,7 @@
       "last_reviewed": "2026-05-08T21:43:28.572580",
       "next_due": "2026-05-09T21:43:28.572580",
       "times_reviewed": 1,
-      "status": "active",
+      "status": "new",
       "streak_days": 0
     },
     {
@@ -66,7 +66,7 @@
       "last_reviewed": null,
       "next_due": null,
       "times_reviewed": 0,
-      "status": "mastered",
+      "status": "new",
       "streak_days": 0
     },
     {
@@ -96,7 +96,7 @@
       "last_reviewed": null,
       "next_due": null,
       "times_reviewed": 0,
-      "status": "mastered",
+      "status": "new",
       "streak_days": 0
     },
     {
@@ -2633,6 +2633,36 @@
       "times_reviewed": 0,
       "status": "new",
       "streak_days": 0
+    }
+  ],
+  "question_log": [
+    {
+      "date": "2026-05-10",
+      "timestamp": "2026-05-10T01:08:08.268567",
+      "intent": "question",
+      "question": "Give me the best way to solve last two or three problems that I have sold already",
+      "problem_context": "Valid Anagram"
+    },
+    {
+      "date": "2026-05-10",
+      "timestamp": "2026-05-10T01:09:07.002529",
+      "intent": "question",
+      "question": "Anagram and find if elements are present",
+      "problem_context": "Valid Anagram"
+    },
+    {
+      "date": "2026-05-10",
+      "timestamp": "2026-05-10T01:10:05.156763",
+      "intent": "question",
+      "question": "Give me complete solution",
+      "problem_context": "Valid Anagram"
+    },
+    {
+      "date": "2026-05-10",
+      "timestamp": "2026-05-10T01:11:02.075033",
+      "intent": "question",
+      "question": "Give me complete solution",
+      "problem_context": "Valid Anagram"
     }
   ]
 }

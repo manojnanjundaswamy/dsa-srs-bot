@@ -348,11 +348,183 @@ def send_telegram_message(text, reply_markup=None):
         )
         return None
 
-def create_difficulty_buttons(problem_index):
-    """Create inline keyboard with difficulty buttons using numeric index to avoid 64-byte callback_data limit"""
+# Follow-up button sets for different use cases (predefined + Ask More)
+FOLLOWUP_SETS = {
+    "pattern_explain": [
+        [
+            {"text": "💻 Java Code", "callback_data": "followup:java:{idx}"},
+            {"text": "🎤 Interview Tips", "callback_data": "followup:interview:{idx}"},
+            {"text": "🔗 Similar Problems", "callback_data": "followup:similar:{idx}"},
+        ],
+        [
+            {"text": "💬 Ask More", "callback_data": "followup:askmore:{idx}"},
+        ],
+    ],
+    "interview_prep": [
+        [
+            {"text": "📋 Full Solution", "callback_data": "followup:solution:{idx}"},
+            {"text": "⏱️ Complexity", "callback_data": "followup:complexity:{idx}"},
+            {"text": "🔄 Try Another", "callback_data": "followup:next:{idx}"},
+        ],
+        [
+            {"text": "💬 Ask More", "callback_data": "followup:askmore:{idx}"},
+        ],
+    ],
+    "approach_check": [
+        [
+            {"text": "💻 Optimal Code", "callback_data": "followup:solution:{idx}"},
+            {"text": "⏱️ Complexity", "callback_data": "followup:complexity:{idx}"},
+            {"text": "🎤 Interview Tips", "callback_data": "followup:interview:{idx}"},
+        ],
+        [
+            {"text": "💬 Ask More", "callback_data": "followup:askmore:{idx}"},
+        ],
+    ],
+    "code_template": [
+        [
+            {"text": "🎤 Interview Tips", "callback_data": "followup:interview:{idx}"},
+            {"text": "🔗 Similar Problems", "callback_data": "followup:similar:{idx}"},
+            {"text": "📝 Edge Cases", "callback_data": "followup:edgecases:{idx}"},
+        ],
+        [
+            {"text": "💬 Ask More", "callback_data": "followup:askmore:{idx}"},
+        ],
+    ],
+    "compare": [
+        [
+            {"text": "💡 When to Use Each", "callback_data": "followup:whentouse:{idx}"},
+            {"text": "🔗 Practice Problem", "callback_data": "followup:similar:{idx}"},
+        ],
+        [
+            {"text": "💬 Ask More", "callback_data": "followup:askmore:{idx}"},
+        ],
+    ],
+    "stuck": [
+        [
+            {"text": "📋 Full Solution", "callback_data": "followup:solution:{idx}"},
+            {"text": "💡 Another Hint", "callback_data": "followup:hint:{idx}"},
+            {"text": "➡️ Next Problem", "callback_data": "followup:next:{idx}"},
+        ],
+        [
+            {"text": "💬 Ask More", "callback_data": "followup:askmore:{idx}"},
+        ],
+    ],
+    "difficulty": [
+        [
+            {"text": "➡️ Next Problem", "callback_data": "followup:next:{idx}"},
+            {"text": "💬 Ask About This", "callback_data": "followup:askmore:{idx}"},
+            {"text": "📈 My Stats", "callback_data": "followup:stats:{idx}"},
+        ],
+    ],
+    "stats": [
+        [
+            {"text": "📈 Weak Areas", "callback_data": "followup:weak:{idx}"},
+            {"text": "📝 Create Plan", "callback_data": "followup:plan:{idx}"},
+        ],
+        [
+            {"text": "💬 Ask More", "callback_data": "followup:askmore:{idx}"},
+        ],
+    ],
+    "default": [
+        [
+            {"text": "➡️ Next Problem", "callback_data": "followup:next:{idx}"},
+            {"text": "💬 Ask More", "callback_data": "followup:askmore:{idx}"},
+        ],
+    ],
+}
+
+def create_followup_buttons(problem_index, use_case="default"):
+    """Create follow-up buttons for a given use case"""
     idx = str(problem_index)
-    return {
-        "inline_keyboard": [
+
+    # Get the button set for this use case, default to generic
+    button_set = FOLLOWUP_SETS.get(use_case, FOLLOWUP_SETS["default"])
+
+    # Replace {idx} placeholders with actual problem index
+    formatted_buttons = []
+    for row in button_set:
+        formatted_row = []
+        for btn in row:
+            formatted_btn = {
+                "text": btn["text"],
+                "callback_data": btn["callback_data"].replace("{idx}", idx)
+            }
+            formatted_row.append(formatted_btn)
+        formatted_buttons.append(formatted_row)
+
+    return {"inline_keyboard": formatted_buttons}
+
+def create_adaptive_buttons(problem_index, message_type="default"):
+    """Create context-aware inline keyboard based on message type"""
+    idx = str(problem_index)
+
+    button_sets = {
+        "morning": [
+            [
+                {"text": "📚 Learn Pattern", "callback_data": f"learn:{idx}"},
+                {"text": "📖 More Examples", "callback_data": f"examples:{idx}"},
+            ],
+            [
+                {"text": "💪 I'm Ready", "callback_data": f"ready:{idx}"},
+            ],
+            [
+                {"text": "💬 Ask More", "callback_data": f"askq:{idx}"},
+            ]
+        ],
+        "afternoon": [
+            [
+                {"text": "💡 Hint", "callback_data": f"hint:{idx}"},
+                {"text": "📋 Solution", "callback_data": f"solution:{idx}"},
+            ],
+            [
+                {"text": "❓ Stuck?", "callback_data": f"stuck:{idx}"},
+                {"text": "✅ I Solved It", "callback_data": f"solved:{idx}"},
+            ],
+            [
+                {"text": "⏸️ Too Easy", "callback_data": f"toeasy:{idx}"},
+                {"text": "❌ Too Hard", "callback_data": f"tohard:{idx}"},
+            ],
+            [
+                {"text": "➡️ Next Question", "callback_data": f"nextq:{idx}"},
+                {"text": "💬 Ask More", "callback_data": f"askq:{idx}"},
+            ]
+        ],
+        "review": [
+            [
+                {"text": "💡 Hint", "callback_data": f"hint:{idx}"},
+                {"text": "📋 Solution", "callback_data": f"solution:{idx}"},
+            ],
+            [
+                {"text": "✅ I Know It", "callback_data": f"easy:{idx}"},
+                {"text": "⏸️ Medium", "callback_data": f"medium:{idx}"},
+                {"text": "❌ Need Practice", "callback_data": f"hard:{idx}"},
+            ],
+            [
+                {"text": "💬 Ask More", "callback_data": f"askq:{idx}"},
+            ]
+        ],
+        "evening": [
+            [
+                {"text": "📊 My Stats", "callback_data": f"stats:{idx}"},
+                {"text": "📈 Weak Areas", "callback_data": f"weak:{idx}"},
+            ],
+            [
+                {"text": "📝 Create Plan", "callback_data": f"plan:{idx}"},
+            ],
+            [
+                {"text": "💬 Ask More", "callback_data": f"askq:{idx}"},
+            ]
+        ],
+        "night": [
+            [
+                {"text": "📊 My Stats", "callback_data": f"stats:{idx}"},
+                {"text": "➡️ Next Question", "callback_data": f"nextq:{idx}"},
+            ],
+            [
+                {"text": "💬 Ask More", "callback_data": f"askq:{idx}"},
+            ]
+        ],
+        "default": [
             [
                 {"text": "✅ Easy", "callback_data": f"easy:{idx}"},
                 {"text": "⏸️ Medium", "callback_data": f"medium:{idx}"},
@@ -364,14 +536,20 @@ def create_difficulty_buttons(problem_index):
                 {"text": "⏭️ Skip", "callback_data": f"skip:{idx}"},
             ],
             [
-                {"text": "🏆 Done — I've mastered this", "callback_data": f"mastered:{idx}"},
+                {"text": "🏆 Mastered", "callback_data": f"mastered:{idx}"},
+            ],
+            [
+                {"text": "💬 Ask More", "callback_data": f"askq:{idx}"},
             ]
         ]
     }
 
+    buttons = button_sets.get(message_type, button_sets["default"])
+    return {"inline_keyboard": buttons}
+
 def generate_afternoon_message(problem):
     """Generate afternoon solving session message with step-by-step approach + pseudocode"""
-    client = Anthropic()
+    client = Anthropic(api_key=CLAUDE_API_KEY)
     api_start = time.time()
 
     prompt = f"""Generate a detailed afternoon DSA solving session guide. Be specific and practical.
@@ -452,7 +630,7 @@ This pattern ({problem['pattern']}) is essential for interviews. Let's go! 💪"
 
 def generate_night_summary(tracker, problem, difficulty=None):
     """Generate night summary with tomorrow's preview using Claude"""
-    client = Anthropic()
+    client = Anthropic(api_key=CLAUDE_API_KEY)
     api_start = time.time()
 
     pattern = problem['pattern']
@@ -606,7 +784,9 @@ Warm-up tip: Review the pattern approach before solving the main problem.
 
 {reviews_line}Streak: {tracker['metadata']['streak_days']} days | Total solved: {tracker['metadata']['total_problems_solved']}"""
 
-    send_telegram_message(message)
+    next_problem_index = tracker["problems"].index(next_problem)
+    buttons = create_adaptive_buttons(next_problem_index, message_type="morning")
+    send_telegram_message(message, reply_markup=buttons)
     print(f"✅ Morning prep sent for pattern: {pattern}")
 
 def generate_review_message(problem):
@@ -775,7 +955,7 @@ def afternoon_mode():
     for review in due_reviews[:3]:
         msg = generate_review_message(review)
         review_index = tracker["problems"].index(review)
-        buttons = create_difficulty_buttons(review_index)
+        buttons = create_adaptive_buttons(review_index, message_type="review")
         send_telegram_message(msg, reply_markup=buttons)
         logger.info(f"Review message sent: {review['title']}")
 
@@ -792,7 +972,7 @@ def afternoon_mode():
         message = f"📝 Problem: {new_problem['title']}\n💡 Pattern: {new_problem['pattern']}\n🔗 {new_problem['leetcode_url']}"
 
     new_problem_index = tracker["problems"].index(new_problem)
-    buttons = create_difficulty_buttons(new_problem_index)
+    buttons = create_adaptive_buttons(new_problem_index, message_type="afternoon")
     send_telegram_message(message, reply_markup=buttons)
     print(f"✅ Afternoon session reminder sent for: {new_problem['title']}")
 
@@ -821,7 +1001,9 @@ Total solved: {tracker['metadata']['total_problems_solved']}
 
 Go through the review problems and try to recall the approach from memory."""
 
-    send_telegram_message(message)
+    next_problem_index = tracker["problems"].index(next_problem)
+    buttons = create_adaptive_buttons(next_problem_index, message_type="evening")
+    send_telegram_message(message, reply_markup=buttons)
     print(f"✅ Evening review reminder sent")
 
 def night_mode():
@@ -843,7 +1025,9 @@ def night_mode():
         print(f"Claude API error: {e}")
         message = f"🌙 Night Summary\nPattern: {next_problem['pattern']}\nTomorrow: Another step forward!"
 
-    send_telegram_message(message)
+    next_problem_index = tracker["problems"].index(next_problem)
+    buttons = create_adaptive_buttons(next_problem_index, message_type="night")
+    send_telegram_message(message, reply_markup=buttons)
 
     # Send tomorrow's preview
     if tomorrow_problem:
@@ -916,8 +1100,8 @@ def handle_button_callback(callback_data):
         return None
 
     # Prevent stale buttons from re-scheduling an archived problem
-    # But allow hint and solution to always work (read-only actions)
-    if problem.get("status") == "mastered" and action not in ("hint", "solution"):
+    # But allow hint, solution, stats, weak, learn, examples to always work (read-only actions)
+    if problem.get("status") == "mastered" and action not in ("hint", "solution", "stats", "weak", "learn", "examples"):
         return None
 
     if action in ("easy", "medium", "hard"):
@@ -939,8 +1123,462 @@ def handle_button_callback(callback_data):
         return (problem["title"], None, "mastered", None)
     elif action == "solution":
         return (problem["title"], None, "solution", problem)
+    elif action == "stuck":
+        return (problem["title"], None, "stuck", problem)
+    elif action == "solved":
+        return (problem["title"], None, "solved", None)
+    elif action == "toeasy":
+        return (problem["title"], None, "toeasy", None)
+    elif action == "tohard":
+        return (problem["title"], None, "tohard", None)
+    elif action == "learn":
+        return (problem["title"], None, "learn", problem)
+    elif action == "examples":
+        return (problem["title"], None, "examples", problem)
+    elif action == "ready":
+        return (problem["title"], None, "ready", None)
+    elif action == "stats":
+        return (problem["title"], None, "stats", tracker)
+    elif action == "weak":
+        return (problem["title"], None, "weak", tracker)
+    elif action == "plan":
+        return (problem["title"], None, "plan", tracker)
+    elif action == "followup":
+        # Parse followup:sub_action:idx format
+        sub_parts = callback_data.split(":", 2)
+        sub_action = sub_parts[1] if len(sub_parts) > 1 else "askmore"
+        return (problem["title"], None, f"followup_{sub_action}", problem)
+    elif action == "nextq":
+        return (problem["title"], None, "nextq", None)
+    elif action == "askq":
+        return (problem["title"], None, "askq", None)
 
     return None
+
+def get_learning_stats(tracker):
+    """Calculate and format learning progress statistics"""
+    total = len(tracker["problems"])
+    active = len([p for p in tracker["problems"] if p["status"] == "active"])
+    new = len([p for p in tracker["problems"] if p["status"] == "new"])
+    mastered = len([p for p in tracker["problems"] if p["status"] == "mastered"])
+
+    total_reviews = sum(p["times_reviewed"] for p in tracker["problems"])
+    avg_ease = sum(p["ease_factor"] for p in tracker["problems"]) / total if total > 0 else 0
+
+    streak = tracker["metadata"]["streak_days"]
+    solved = tracker["metadata"]["total_problems_solved"]
+
+    return f"""📊 <b>Your Learning Stats</b>
+
+🎯 Progress:
+  • Total problems: {total}
+  • New: {new} | Active: {active} | Mastered: {mastered}
+  • Total reviews: {total_reviews}
+  • Avg. ease factor: {avg_ease:.2f}/2.5
+
+🔥 Streak: {streak} days
+✅ Problems solved: {solved}
+⏱️ Last updated: {tracker['metadata'].get('last_updated', 'N/A')}"""
+
+def analyze_weak_areas(tracker):
+    """Identify patterns and problems user struggles with"""
+    if not tracker["problems"]:
+        return "📈 No data yet. Keep practicing! 💪"
+
+    # Find problems with low ease factor or high review count without mastery
+    weak_problems = [
+        p for p in tracker["problems"]
+        if p["status"] != "mastered" and (p["ease_factor"] < 1.5 or p["times_reviewed"] > 3)
+    ]
+
+    # Group by pattern
+    weak_patterns = {}
+    for p in weak_problems:
+        pattern = p["pattern"]
+        weak_patterns[pattern] = weak_patterns.get(pattern, 0) + 1
+
+    if not weak_patterns:
+        return "🌟 <b>You're doing great!</b>\n\nNo weak areas detected. All patterns are looking solid. Keep up the momentum! 💪"
+
+    weak_list = "\n".join([f"  • {p}: {count} problem(s) to revisit" for p, count in sorted(weak_patterns.items(), key=lambda x: x[1], reverse=True)])
+    return f"""📈 <b>Areas to Focus On</b>
+
+Based on your performance:
+{weak_list}
+
+💡 Tip: Revisit these patterns by solving similar problems. Each attempt strengthens your understanding!"""
+
+def get_followup_buttons(tracker, use_case="default"):
+    """Get follow-up buttons for the next problem (generic helper)"""
+    next_p = get_next_problem(tracker)
+    if not next_p:
+        return None
+    idx = tracker["problems"].index(next_p)
+    return create_followup_buttons(idx, use_case)
+
+def log_question(tracker, intent, question_text, problem_context):
+    """Log a user question to the tracker for analysis"""
+    if "question_log" not in tracker:
+        tracker["question_log"] = []
+
+    tracker["question_log"].append({
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "timestamp": datetime.now().isoformat(),
+        "intent": intent,
+        "question": question_text[:200],
+        "problem_context": problem_context
+    })
+
+    save_tracker(tracker)
+    logger.info(f"Question logged: {intent} | {problem_context}")
+
+def detect_intent(text):
+    """Detect user intent from text message. Specific intents checked first."""
+    text_lower = text.lower()
+
+    # Order matters: more specific intents first (catch detailed queries before generic)
+    intents = {
+        # 6 new real-world Q&A use cases (specific)
+        "pattern_explain": ["what is", "explain", "how does", "how do i use", "tell me about", "what are"],
+        "interview_prep": ["interview", "talk about", "explain to", "how would i say", "how to present"],
+        "approach_check": ["is this optimal", "better way", "better approach", "my approach", "is there a better"],
+        "code_template": ["java code", "template", "show code", "skeleton", "boilerplate", "java template"],
+        "compare": ["difference between", " vs ", " versus ", "compare", "which is better"],
+        "simplify": ["don't understand problem", "explain problem", "simpler", "what does it want", "clarify"],
+        # Original intents (generic)
+        "stuck": ["stuck", "help", "guide", "hint", "step", "how do i", "don't understand"],
+        "solution": ["show solution", "solution please", "reveal", "answer", "correct answer"],
+        "difficulty": ["too easy", "too hard", "easy", "hard", "harder", "easier"],
+        "stats": ["stats", "progress", "how much", "my stats", "how many"],
+        "weak": ["weak", "struggle", "bad at", "difficult pattern", "hard pattern"],
+        "plan": ["plan", "schedule", "what should", "recommend", "suggest"],
+        "done": ["done", "solved", "completed", "finished", "i solved"],
+        "skip": ["skip", "next", "different", "another problem"],
+    }
+
+    for intent, keywords in intents.items():
+        if any(kw in text_lower for kw in keywords):
+            return intent
+
+    return "question"
+
+def handle_pattern_explain(text, problem):
+    """Explain the pattern for the current problem with concept + when to use + pitfalls"""
+    client = Anthropic(api_key=CLAUDE_API_KEY)
+    api_start = time.time()
+
+    prompt = f"""Explain the pattern for this DSA problem. Be clear and practical.
+
+Problem: {problem['title']} (LeetCode #{problem['leetcode_number']})
+Pattern: {problem['pattern']}
+Difficulty: {problem['difficulty']}
+
+Include:
+1. What is this pattern? (concept in 1-2 sentences)
+2. When to use it? (practical scenarios)
+3. Key pitfalls? (1-2 common mistakes)
+4. Quick Java skeleton (5-8 lines, structure only)
+
+Keep under 200 words. Make it actionable."""
+
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=250,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        elapsed = (time.time() - api_start) * 1000
+        logger.info(f"Claude API (pattern_explain): {elapsed:.0f}ms")
+        return f"📚 <b>{problem['pattern']} Pattern Explained</b>\n\n{response.content[0].text}"
+    except Exception as e:
+        logger.error(f"Claude pattern_explain error: {e}")
+        explanation = PATTERN_EXPLANATIONS.get(problem["pattern"], "Master this pattern for interview success.")
+        return f"📚 <b>{problem['pattern']} Pattern</b>\n\n{explanation}"
+
+def handle_interview_prep(problem):
+    """Generate interview talking points for the problem"""
+    client = Anthropic(api_key=CLAUDE_API_KEY)
+    api_start = time.time()
+
+    prompt = f"""Generate 3 clear talking points for explaining this problem in an interview.
+
+Problem: {problem['title']} (LeetCode #{problem['leetcode_number']})
+Pattern: {problem['pattern']}
+Difficulty: {problem['difficulty']}
+
+Format:
+1. [Point 1]: Why this approach works
+2. [Point 2]: Time/Space complexity explanation
+3. [Point 3]: Common follow-up or edge case
+
+Conversational tone, 1-2 sentences each. Under 150 words."""
+
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=200,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        elapsed = (time.time() - api_start) * 1000
+        logger.info(f"Claude API (interview_prep): {elapsed:.0f}ms")
+        return f"🎤 <b>Interview Talking Points</b>\n\n{response.content[0].text}"
+    except Exception as e:
+        logger.error(f"Claude interview_prep error: {e}")
+        return "🎤 <b>Interview Tips</b>\n\nFocus on: approach, complexity, and edge cases. Practice explaining clearly!"
+
+def handle_approach_check(problem):
+    """Analyze if the approach is optimal"""
+    client = Anthropic(api_key=CLAUDE_API_KEY)
+    api_start = time.time()
+
+    prompt = f"""Analyze the optimal approach for this DSA problem.
+
+Problem: {problem['title']} (LeetCode #{problem['leetcode_number']})
+Pattern: {problem['pattern']}
+Difficulty: {problem['difficulty']}
+
+Provide:
+1. Best pattern to use and why
+2. Why alternatives are worse (1-2 lines)
+3. Time/Space complexity (brief)
+
+Under 150 words. Be direct."""
+
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=180,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        elapsed = (time.time() - api_start) * 1000
+        logger.info(f"Claude API (approach_check): {elapsed:.0f}ms")
+        return f"✅ <b>Optimal Approach</b>\n\n{response.content[0].text}"
+    except Exception as e:
+        logger.error(f"Claude approach_check error: {e}")
+        return "✅ <b>Approach</b>\n\nUse the pattern specified for this problem. It's optimal for this category."
+
+def handle_code_template(problem):
+    """Provide a Java code skeleton/template"""
+    client = Anthropic(api_key=CLAUDE_API_KEY)
+    api_start = time.time()
+
+    prompt = f"""Provide a clean Java implementation template/skeleton for this problem.
+
+Problem: {problem['title']} (LeetCode #{problem['leetcode_number']})
+Pattern: {problem['pattern']}
+
+Output ONLY the Java code (class + method skeleton, 10-15 lines). Include brief comments.
+No explanations, just clean, ready-to-fill-in code."""
+
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=180,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        elapsed = (time.time() - api_start) * 1000
+        logger.info(f"Claude API (code_template): {elapsed:.0f}ms")
+        return f"💻 <b>Java Code Template</b>\n\n<pre><code>{response.content[0].text}</code></pre>"
+    except Exception as e:
+        logger.error(f"Claude code_template error: {e}")
+        return "💻 <b>Java Template</b>\n\nStart with: class Solution { ... } and fill in the logic."
+
+def handle_compare(text, problem):
+    """Compare two concepts mentioned in the text"""
+    client = Anthropic(api_key=CLAUDE_API_KEY)
+    api_start = time.time()
+
+    prompt = f"""Compare the two DSA concepts mentioned in the user's question.
+User asked: {text}
+Current problem: {problem['title']} ({problem['pattern']})
+
+Provide side-by-side:
+1. Concept A: When to use, key difference
+2. Concept B: When to use, key difference
+3. Example problem for each
+
+Under 200 words. Be concise."""
+
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=220,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        elapsed = (time.time() - api_start) * 1000
+        logger.info(f"Claude API (compare): {elapsed:.0f}ms")
+        return f"⚖️ <b>Comparison</b>\n\n{response.content[0].text}"
+    except Exception as e:
+        logger.error(f"Claude compare error: {e}")
+        return "⚖️ <b>Comparison</b>\n\nCompare concepts side-by-side in your notes. Practice both!"
+
+def handle_problem_simplify(problem):
+    """Restate the problem in the simplest terms"""
+    client = Anthropic(api_key=CLAUDE_API_KEY)
+    api_start = time.time()
+
+    prompt = f"""Restate this problem in the SIMPLEST possible terms with a tiny concrete example.
+
+Problem: {problem['title']} (LeetCode #{problem['leetcode_number']})
+Description: {problem.get('description', 'See LeetCode')}
+
+Format:
+1. Simplest explanation (no jargon, 2 sentences max)
+2. Concrete example: input → output (very simple numbers)
+
+Under 100 words."""
+
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=140,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        elapsed = (time.time() - api_start) * 1000
+        logger.info(f"Claude API (problem_simplify): {elapsed:.0f}ms")
+        return f"🎯 <b>Simple Explanation</b>\n\n{response.content[0].text}"
+    except Exception as e:
+        logger.error(f"Claude problem_simplify error: {e}")
+        return "🎯 <b>Simple Explanation</b>\n\nBreak the problem into tiny input/output examples."
+
+def handle_stuck_message(problem, tracker):
+    """Generate guided hint for stuck user - Claude powered"""
+    client = Anthropic(api_key=CLAUDE_API_KEY)
+    api_start = time.time()
+
+    prompt = f"""User is stuck on this DSA problem. Give a GUIDED hint only - NO CODE, NO SOLUTION.
+Be a helpful mentor. Ask Socratic questions to guide their thinking.
+
+Problem: {problem['title']} (LeetCode #{problem['leetcode_number']})
+Pattern: {problem['pattern']}
+Difficulty: {problem['difficulty']}
+
+Format:
+1. One guiding question to start their thinking
+2. A conceptual nudge (1-2 lines, no code)
+3. Data structure hint: which one to consider?
+
+Keep under 100 words. Be encouraging."""
+
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=150,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        elapsed = (time.time() - api_start) * 1000
+        logger.info(f"Claude API (adaptive hint): {elapsed:.0f}ms")
+        return f"🤝 <b>Let's work through this together</b>\n\n{response.content[0].text}\n\n💪 You've got this! Take your time."
+    except Exception as e:
+        logger.error(f"Claude adaptive hint error: {e}")
+        hint = PATTERN_EXPLANATIONS.get(problem["pattern"], "Think about the core pattern.")
+        return f"💡 <b>Hint:</b>\n{hint}\n\nTap 📋 Solution if you need the full approach."
+
+def handle_text_message(message_text, tracker):
+    """Process user text message and route to appropriate handler"""
+    intent = detect_intent(message_text)
+    next_problem = get_next_problem(tracker)
+
+    if not next_problem:
+        return "🎉 All problems covered! Great work! Take a break and come back tomorrow. 🌟"
+
+    logger.info(f"Text intent detected: {intent} | message: {message_text[:50]}")
+
+    # 6 new Q&A use cases (specific intents)
+    if intent == "pattern_explain":
+        log_question(tracker, intent, message_text, next_problem["title"])
+        msg = handle_pattern_explain(message_text, next_problem)
+        idx = tracker["problems"].index(next_problem)
+        # Return with follow-up buttons would need to be in poll_mode; for now just return msg
+        return msg
+
+    elif intent == "interview_prep":
+        log_question(tracker, intent, message_text, next_problem["title"])
+        return handle_interview_prep(next_problem)
+
+    elif intent == "approach_check":
+        log_question(tracker, intent, message_text, next_problem["title"])
+        return handle_approach_check(next_problem)
+
+    elif intent == "code_template":
+        log_question(tracker, intent, message_text, next_problem["title"])
+        return handle_code_template(next_problem)
+
+    elif intent == "compare":
+        log_question(tracker, intent, message_text, next_problem["title"])
+        return handle_compare(message_text, next_problem)
+
+    elif intent == "simplify":
+        log_question(tracker, intent, message_text, next_problem["title"])
+        return handle_problem_simplify(next_problem)
+
+    # Original intents
+    elif intent == "stuck":
+        return handle_stuck_message(next_problem, tracker)
+
+    elif intent == "solution":
+        return generate_solution_preview(next_problem)
+
+    elif intent == "stats":
+        return get_learning_stats(tracker)
+
+    elif intent == "weak":
+        return analyze_weak_areas(tracker)
+
+    elif intent == "plan":
+        return f"""📋 <b>Suggested Study Plan</b>
+
+Based on your progress:
+1. 🌅 Morning: Learn the pattern (5 min)
+2. ☀️ Afternoon: Solve the main problem (30 min)
+3. 📖 Evening: Review any problems due today (20 min)
+4. 🌙 Night: Review approach and similar patterns (5 min)
+
+🔁 Repeat each problem every {tracker['metadata'].get('interval_days', 1)} days.
+
+Remember: Consistency beats intensity. Daily practice wins! 💪"""
+
+    elif intent == "done":
+        return "🎉 <b>Awesome!</b> Mark your difficulty level with the buttons above to schedule the next review.\n\n✅ Easy | ⏸️ Medium | ❌ Hard"
+
+    elif intent == "skip":
+        next_p = get_next_problem(tracker)
+        if next_p:
+            msg = generate_afternoon_message(next_p)
+            idx = tracker["problems"].index(next_p)
+            return msg
+        else:
+            return "🎉 All problems covered!"
+
+    elif intent == "difficulty":
+        if "hard" in message_text.lower():
+            return "📈 Noted! I'll make the next problem harder. Keep pushing your limits! 💪"
+        elif "easy" in message_text.lower():
+            return "✅ Noted! I'll adjust to more reasonable difficulty. Learning at your pace! 🎯"
+
+    else:  # general question
+        log_question(tracker, intent, message_text, next_problem["title"])
+        client = Anthropic(api_key=CLAUDE_API_KEY)
+        api_start = time.time()
+
+        prompt = f"""User asked a question about DSA learning. Answer helpfully in 2-3 sentences.
+Current problem: {next_problem['title']} ({next_problem['pattern']})
+User question: {message_text}
+
+Be encouraging and specific."""
+
+        try:
+            response = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=150,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            elapsed = (time.time() - api_start) * 1000
+            logger.info(f"Claude API (Q&A): {elapsed:.0f}ms")
+            return f"💭 <b>Answer:</b>\n\n{response.content[0].text}"
+        except Exception as e:
+            logger.error(f"Claude Q&A error: {e}")
+            return "💡 That's a great question! Keep thinking deeply about it. 🧠\n\nTap a button above for quick actions."
 
 OFFSET_FILE = SCRIPT_DIR / "telegram_offset.json"
 
@@ -955,7 +1593,7 @@ def save_offset(offset):
         json.dump({"offset": offset}, f)
 
 def poll_mode():
-    """Fetch pending button taps from Telegram and update tracker"""
+    """Fetch pending button taps and text messages from Telegram"""
     offset = load_offset()
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
@@ -989,13 +1627,27 @@ def poll_mode():
     )
 
     if not updates:
-        logger.debug("No new button taps")
+        logger.debug("No new updates")
         return
 
     for update in updates:
         update_id = update["update_id"]
 
-        if "callback_query" in update:
+        # Handle text messages (new feature: direct chat input)
+        if "message" in update:
+            msg = update["message"]
+            user_text = msg.get("text", "").strip()
+
+            if user_text and not user_text.startswith("/"):  # Ignore commands
+                logger.info(f"Text message received: {user_text[:50]}")
+                tracker = load_tracker()
+
+                response_msg = handle_text_message(user_text, tracker)
+                send_telegram_message(response_msg)
+
+                logger.info(f"Text message handled: {user_text[:30]}")
+
+        elif "callback_query" in update:
             cq = update["callback_query"]
             callback_query_id = cq["id"]
             callback_data = cq.get("data", "")
@@ -1016,6 +1668,62 @@ def poll_mode():
                     send_telegram_message(hint_msg)
                     logger.info(f"Hint sent for: {title}")
 
+                elif action == "solution":
+                    problem = extra  # full problem dict
+                    solution_msg = generate_solution_preview(problem)
+                    send_telegram_message(solution_msg)
+                    logger.info(f"Solution sent for: {title}")
+
+                elif action == "stuck":
+                    problem = extra  # full problem dict
+                    stuck_msg = handle_stuck_message(problem, load_tracker())
+                    send_telegram_message(stuck_msg)
+                    logger.info(f"Adaptive hint (stuck) sent for: {title}")
+
+                elif action == "learn":
+                    problem = extra  # full problem dict
+                    pattern = problem["pattern"]
+                    explanation = PATTERN_EXPLANATIONS.get(pattern, "Master this pattern for interview success.")
+                    learn_msg = f"📚 <b>{pattern}</b>\n\n{explanation}\n\n💡 Ready to solve {problem['title']}?"
+                    send_telegram_message(learn_msg)
+                    logger.info(f"Pattern learning sent: {pattern}")
+
+                elif action == "examples":
+                    problem = extra  # full problem dict
+                    pattern = problem["pattern"]
+                    similar = [p for p in load_tracker()["problems"] if p["pattern"] == pattern and p["id"] != problem["id"]][:3]
+                    similar_list = "\n".join([f"  • {p['title']} (LC #{p['leetcode_number']})" for p in similar]) if similar else "  No other examples yet"
+                    examples_msg = f"📖 <b>More {pattern} Problems</b>\n\n{similar_list}\n\n🔗 Solve these to master the pattern!"
+                    send_telegram_message(examples_msg)
+                    logger.info(f"Examples sent for: {pattern}")
+
+                elif action == "stats":
+                    tracker_fresh = load_tracker()
+                    stats_msg = get_learning_stats(tracker_fresh)
+                    send_telegram_message(stats_msg)
+                    logger.info(f"Learning stats sent")
+
+                elif action == "weak":
+                    tracker_fresh = load_tracker()
+                    weak_msg = analyze_weak_areas(tracker_fresh)
+                    send_telegram_message(weak_msg)
+                    logger.info(f"Weak areas analysis sent")
+
+                elif action == "plan":
+                    plan_msg = """📋 <b>Suggested Study Plan</b>
+
+Based on your progress:
+1. 🌅 Morning: Learn the pattern (5 min)
+2. ☀️ Afternoon: Solve the main problem (30 min)
+3. 📖 Evening: Review any problems due today (20 min)
+4. 🌙 Night: Review approach and similar patterns (5 min)
+
+🔁 Repeat each problem every few days.
+
+Remember: Consistency beats intensity. Daily practice wins! 💪"""
+                    send_telegram_message(plan_msg)
+                    logger.info(f"Study plan sent")
+
                 elif action == "skip":
                     msg = f"⏭️ Skipped <b>{title}</b> — it'll come back tomorrow."
                     send_telegram_message(msg)
@@ -1025,11 +1733,101 @@ def poll_mode():
                     send_telegram_message(msg)
                     logger.info(f"Mastered: {title}")
 
-                elif action == "solution":
+                elif action == "solved":
+                    msg = f"✅ <b>Awesome!</b> You solved <b>{title}</b>! Now rate the difficulty:\n\n✅ Easy | ⏸️ Medium | ❌ Hard"
+                    send_telegram_message(msg)
+
+                elif action == "toeasy":
+                    msg = f"✅ Noted! <b>{title}</b> was too easy. I'll make the next problem more challenging. 📈"
+                    send_telegram_message(msg)
+
+                elif action == "tohard":
+                    msg = f"❌ Noted! <b>{title}</b> was too hard. I'll adjust the difficulty. Let's build your confidence! 💪"
+                    send_telegram_message(msg)
+
+                elif action == "ready":
+                    msg = f"💪 Great! Let's go solve <b>{title}</b>. You've got this! 🚀\n\nRemember: Solve it from first principles, don't just look at hints right away."
+                    send_telegram_message(msg)
+
+                # Follow-up actions from Q&A use cases
+                elif action.startswith("followup_"):
+                    sub_action = action.replace("followup_", "")
                     problem = extra  # full problem dict
-                    solution_msg = generate_solution_preview(problem)
-                    send_telegram_message(solution_msg)
-                    logger.info(f"Solution sent for: {title}")
+
+                    if sub_action == "java":
+                        msg = handle_code_template(problem)
+                    elif sub_action == "interview":
+                        msg = handle_interview_prep(problem)
+                    elif sub_action == "similar":
+                        pattern = problem["pattern"]
+                        similar = [p for p in load_tracker()["problems"] if p["pattern"] == pattern and p["id"] != problem["id"]][:3]
+                        similar_list = "\n".join([f"  • {p['title']} (LC #{p['leetcode_number']})" for p in similar]) if similar else "  No other examples yet"
+                        msg = f"🔗 <b>Similar {pattern} Problems</b>\n\n{similar_list}"
+                    elif sub_action == "solution":
+                        msg = generate_solution_preview(problem)
+                    elif sub_action == "complexity":
+                        msg = handle_approach_check(problem)
+                    elif sub_action == "hint":
+                        msg = generate_hint_message(problem)
+                    elif sub_action == "next":
+                        tracker_fresh = load_tracker()
+                        next_p = get_next_problem(tracker_fresh)
+                        if next_p:
+                            msg = generate_afternoon_message(next_p)
+                            idx = tracker_fresh["problems"].index(next_p)
+                            buttons = create_adaptive_buttons(idx, "afternoon")
+                            send_telegram_message(msg, reply_markup=buttons)
+                            logger.info(f"Next problem sent: {next_p['title']}")
+                        else:
+                            msg = "🎉 All problems covered! Come back tomorrow."
+                    elif sub_action == "whentouse":
+                        msg = f"💡 <b>When to Use Each:</b>\n\nCheck your notes and practice both approaches on similar problems!"
+                    elif sub_action == "edgecases":
+                        msg = f"📝 <b>Edge Cases to Consider:</b>\n\nThink about: empty input, single element, duplicates, large numbers, negative values."
+                    elif sub_action == "stats":
+                        tracker_fresh = load_tracker()
+                        msg = get_learning_stats(tracker_fresh)
+                    elif sub_action == "weak":
+                        tracker_fresh = load_tracker()
+                        msg = analyze_weak_areas(tracker_fresh)
+                    elif sub_action == "plan":
+                        msg = """📋 <b>Suggested Study Plan</b>
+
+Based on your progress:
+1. 🌅 Morning: Learn the pattern (5 min)
+2. ☀️ Afternoon: Solve the main problem (30 min)
+3. 📖 Evening: Review any problems due today (20 min)
+4. 🌙 Night: Review approach and similar patterns (5 min)
+
+🔁 Repeat each problem every few days.
+
+Remember: Consistency beats intensity. Daily practice wins! 💪"""
+                    elif sub_action == "askmore":
+                        msg = "💬 <b>What would you like to know?</b>\n\nAsk me anything about this problem, the pattern, interview tips, or any DSA concept!"
+                    else:
+                        msg = "💬 Follow-up coming up!"
+
+                    send_telegram_message(msg)
+                    logger.info(f"Follow-up action {sub_action} sent for: {title}")
+
+                elif action == "nextq":
+                    tracker_fresh = load_tracker()
+                    next_p = get_next_problem(tracker_fresh)
+                    if next_p:
+                        msg = generate_afternoon_message(next_p)
+                        idx = tracker_fresh["problems"].index(next_p)
+                        buttons = create_adaptive_buttons(idx, "afternoon")
+                        send_telegram_message(msg, reply_markup=buttons)
+                        logger.info(f"Next question sent: {next_p['title']}")
+                    else:
+                        send_telegram_message("🎉 All problems covered! Come back tomorrow.")
+
+                elif action == "askq":
+                    send_telegram_message(
+                        "💬 <b>What would you like to know?</b>\n\n"
+                        "Ask me anything about this problem, the pattern, interview tips, or any DSA concept!"
+                    )
+                    logger.info(f"Ask more prompt sent")
 
                 else:
                     # difficulty rating: easy / medium / hard
