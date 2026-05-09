@@ -35,9 +35,14 @@ def _migrate_sqlite():
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
-        # Columns to add if missing: (table, column, type, default)
+        # Columns to add if missing: (table, column, type, default_expr)
         pending = [
+            # tasks table
             ("tasks", "last_run_status", "VARCHAR(16)", "NULL"),
+            # assets table — revamped schema (data blob → typed columns)
+            ("assets", "description",   "TEXT",          "''"),
+            ("assets", "record_schema", "TEXT",          "'{}'"),
+            ("assets", "updated_at",    "DATETIME",      "NULL"),
         ]
 
         for table, col, col_type, default in pending:

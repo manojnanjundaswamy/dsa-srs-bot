@@ -24,9 +24,11 @@ if str(_PROJECT_ROOT) not in sys.path:
 from task_engine.models import Task, TaskRun
 
 
-def _build_context(task: Task, event_data: Optional[dict] = None) -> dict:
+def _build_context(task: Task, event_data: Optional[dict] = None,
+                   db: Optional["Session"] = None) -> dict:
     """Build the exec() globals dict for a task script."""
     import requests
+    from task_engine.asset_helpers import build_asset_context
 
     # Import reminder_bot lazily so logger is initialized by the time we use it
     try:
@@ -85,6 +87,12 @@ def _build_context(task: Task, event_data: Optional[dict] = None) -> dict:
         "print":     lambda *a, **_: output.append(" ".join(str(x) for x in a)),
         "_output":   output,  # executor reads this after exec()
     }
+
+    # ── DB-native asset helpers (get_user, get_next_record, apply_review…) ──
+    # Injected after ctx so they can reference it if needed
+    if db is not None:
+        ctx.update(build_asset_context(db))
+
     return ctx
 
 
@@ -104,7 +112,7 @@ def run_task(task: Task, db: Session, triggered_by: str = "manual",
     db.commit()
     db.refresh(run)
 
-    ctx = _build_context(task, event_data)
+    ctx = _build_context(task, event_data, db=db)
     output_lines: list[str] = ctx["_output"]
     error_text: Optional[str] = None
 
