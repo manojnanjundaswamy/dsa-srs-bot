@@ -1,0 +1,197 @@
+"""
+Task Engine — FastAPI entry point.
+
+Start with:
+    uvicorn task_engine.api:app --host 127.0.0.1 --port 8080
+
+API docs available at: http://127.0.0.1:8080/docs
+"""
+
+import logging
+from contextlib import asynccontextmanager
+from datetime import datetime
+from typing import Any, Dict
+
+from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+
+from task_engine import scheduler as sched
+from task_engine.database import SessionLocal, get_db, init_db
+from task_engine.models import Task
+from task_engine.routers import events, runs, tasks
+from task_engine.schemas import SchedulerStatusResponse
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+)
+
+# ── Seed tasks (migrated from reminder_bot.py modes) ─────────────────────────
+
+SEED_TASKS = [
+    {
+        "id": "dsa-morning",
+        "name": "DSA Morning Session",
+        "description": "Sends morning pattern + problem message to Telegram at 7 AM",
+        "type": "cron",
+        "trigger_config": {"cron": "0 7 * * *", "timezone": "Asia/Kolkata"},
+        "script": "morning_mode()",
+        "script_args": {},
+        "prompt": "Send DSA morning prep message to Telegram at 7 AM daily",
+        "enabled": True,
+    },
+    {
+        "id": "dsa-afternoon",
+        "name": "DSA Afternoon Session",
+        "description": "Sends afternoon problem + adaptive buttons to Telegram at 3 PM",
+        "type": "cron",
+        "trigger_config": {"cron": "0 15 * * *", "timezone": "Asia/Kolkata"},
+        "script": "afternoon_mode()",
+        "script_args": {},
+        "prompt": "Send DSA afternoon problem-solving session message to Telegram at 3 PM",
+        "enabled": True,
+    },
+    {
+        "id": "dsa-evening",
+        "name": "DSA Evening Review",
+        "description": "Sends evening SRS review reminder to Telegram at 7 PM",
+        "type": "cron",
+        "trigger_config": {"cron": "0 19 * * *", "timezone": "Asia/Kolkata"},
+        "script": "evening_mode()",
+        "script_args": {},
+        "prompt": "Send DSA evening review reminder to Telegram at 7 PM",
+        "enabled": True,
+    },
+    {
+        "id": "dsa-night",
+        "name": "DSA Night Summary",
+        "description": "Sends night summary with tomorrow's preview at 10 PM",
+        "type": "cron",
+        "trigger_config": {"cron": "0 22 * * *", "timezone": "Asia/Kolkata"},
+        "script": "night_mode()",
+        "script_args": {},
+        "prompt": "Send DSA night summary with tomorrow's problem preview at 10 PM",
+        "enabled": True,
+    },
+    {
+        "id": "telegram-listener",
+        "name": "Telegram Message Listener",
+        "description": "Polls Telegram every 10 seconds for button taps and text messages",
+        "type": "interval",
+        "trigger_config": {"interval_seconds": 10},
+        "script": "poll_mode()",
+        "script_args": {},
+        "prompt": "Poll Telegram every 10 seconds for messages and button taps",
+        "enabled": True,
+    },
+]
+
+
+def _seed_tasks(db: Session) -> None:
+    """Insert any missing seed tasks (checks by ID, not count)."""
+    seed_ids = [t["id"] for t in SEED_TASKS]
+    existing_ids = {row[0] for row in db.query(Task.id).filter(Task.id.in_(seed_ids)).all()}
+    to_insert = [t for t in SEED_TASKS if t["id"] not in existing_ids]
+
+    if not to_insert:
+        logger.info("All seed tasks already present — skipping seed")
+        return
+
+    for t in to_insert:
+        task = Task(
+            id=t["id"],
+            name=t["name"],
+            description=t.get("description", ""),
+            type=t["type"],
+            trigger_config=t.get("trigger_config", {}),
+            script=t["script"],
+            script_args=t.get("script_args", {}),
+            prompt=t.get("prompt", ""),
+            enabled=t.get("enabled", True),
+        )
+        db.add(task)
+
+    db.commit()
+    logger.info(f"{len(to_insert)} seed task(s) inserted")
+
+
+# ── App lifespan ──────────────────────────────────────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Task Engine starting up")
+    init_db()
+
+    db = SessionLocal()
+    try:
+        _seed_tasks(db)
+        job_count = sched.load_all_jobs(db)
+        logger.info(f"Loaded {job_count} schedulable job(s) from DB")
+    finally:
+        db.close()
+
+    sched.start()
+    logger.info("Scheduler started — task engine is live")
+
+    yield  # app runs here
+
+    # Shutdown
+    sched.stop()
+    logger.info("Task Engine shut down cleanly")
+
+
+# ── FastAPI app ───────────────────────────────────────────────────────────────
+
+app = FastAPI(
+    title="Task Engine",
+    description="Configurable workflow automation for the DSA bot. "
+                "Tasks stored in SQLite (PostgreSQL-migratable), "
+                "scheduled via APScheduler, scripts generated by Claude.",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # tighten for production
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ── Routers ───────────────────────────────────────────────────────────────────
+
+app.include_router(tasks.router)
+app.include_router(runs.router)
+app.include_router(events.router)
+
+
+# ── Scheduler endpoints ───────────────────────────────────────────────────────
+
+@app.get("/api/scheduler/status", response_model=SchedulerStatusResponse, tags=["scheduler"])
+def scheduler_status(db: Session = Depends(get_db)):
+    """
+    Return current scheduler state with per-job last_run_at and next_run_time.
+    """
+    status = sched.get_status(db)
+    return SchedulerStatusResponse(**status)
+
+
+@app.post("/api/scheduler/reload", tags=["scheduler"])
+def scheduler_reload(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """Re-sync all scheduler jobs from the database (use after manual DB edits)."""
+    count = sched.reload_jobs(db)
+    return {"reloaded_jobs": count}
+
+
+# ── Health check ──────────────────────────────────────────────────────────────
+
+@app.get("/health", tags=["meta"])
+def health() -> Dict[str, Any]:
+    return {
+        "status": "ok",
+        "timestamp": datetime.utcnow().isoformat(),
+        "scheduler_running": sched.get_scheduler().running,
+    }
