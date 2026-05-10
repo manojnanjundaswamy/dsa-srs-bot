@@ -57,6 +57,7 @@ class TaskRunResponse(BaseModel):
     status: str
     output: str
     error: Optional[str]
+    events: List[Dict[str, Any]] = []
     model_config = CFG
 
 

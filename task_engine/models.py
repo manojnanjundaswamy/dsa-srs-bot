@@ -65,6 +65,10 @@ class TaskRun(Base):
     output = Column(Text, default="")
     error = Column(Text, nullable=True)
 
+    # Structured execution trace: [{t, type, msg, level, ms?}]
+    # t = milliseconds since task started; ms = duration for api_call events
+    events = Column(JSON, default=list)
+
     task = relationship("Task", back_populates="runs")
 
 

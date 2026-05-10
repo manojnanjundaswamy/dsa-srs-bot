@@ -1,12 +1,14 @@
 import { NavLink } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { LayoutDashboard, LayoutList, Plus, Zap } from 'lucide-react'
+import { LayoutDashboard, LayoutList, Plus, Zap, Database, Users } from 'lucide-react'
 import { getSchedulerStatus } from '../api/client'
 
 const NAV = [
-  { to: '/',       icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/tasks',  icon: LayoutList,       label: 'Tasks' },
-  { to: '/tasks/new', icon: Plus,         label: 'New Task' },
+  { to: '/',          icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/tasks',     icon: LayoutList,      label: 'Tasks' },
+  { to: '/tasks/new', icon: Plus,            label: 'New Task' },
+  { to: '/assets',    icon: Database,        label: 'Assets' },
+  { to: '/users',     icon: Users,           label: 'Users' },
 ]
 
 export default function Sidebar() {

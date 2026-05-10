@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronRight, RotateCcw } from 'lucide-react'
 import StatusBadge from './StatusBadge'
+import ExecutionTimeline from './ExecutionTimeline'
 
 function relTime(iso) {
   if (!iso) return '—'
@@ -20,8 +21,7 @@ function duration(start, end) {
 
 const td = { padding: '10px 12px', fontSize: 13, borderBottom: '1px solid var(--border)', verticalAlign: 'top' }
 
-// Each run is a single keyed component — renders 1 or 2 <tr> elements safely
-function RunRow({ run, expanded, onToggle, showTask }) {
+function RunRow({ run, expanded, onToggle, showTask, onRetry }) {
   return (
     <>
       <tr
@@ -42,30 +42,74 @@ function RunRow({ run, expanded, onToggle, showTask }) {
         <td style={{ ...td, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)' }}>
           {duration(run.started_at, run.completed_at)}
         </td>
-        <td style={{ ...td, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-          {run.output || <span style={{ color: 'var(--text-muted)' }}>—</span>}
+        <td style={{
+          ...td, maxWidth: 220, overflow: 'hidden',
+          textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          fontFamily: 'var(--font-mono)', fontSize: 12,
+        }}>
+          {run.output
+            ? run.output
+            : run.events?.length
+              ? (() => {
+                  // Show last meaningful event when there's no print() output
+                  const printEv = [...(run.events)].reverse().find(e => e.type === 'print')
+                  const lastEv = [...(run.events)].reverse().find(e => e.type !== 'start')
+                  const ev = printEv ?? lastEv
+                  return ev
+                    ? <span style={{ color: 'var(--text-muted)' }}>{ev.msg.slice(0, 60)}</span>
+                    : <span style={{ color: 'var(--text-muted)' }}>—</span>
+                })()
+              : <span style={{ color: 'var(--text-muted)' }}>—</span>
+          }
+        </td>
+        {/* Retry on failed runs */}
+        <td style={{ ...td, width: 36 }} onClick={e => e.stopPropagation()}>
+          {run.status === 'failed' && onRetry && (
+            <button
+              title="Retry this task"
+              onClick={() => onRetry(run.task_id)}
+              style={{
+                width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(224,84,84,0.1)', border: '1px solid rgba(224,84,84,0.3)',
+                borderRadius: 4, color: 'var(--error)', cursor: 'pointer',
+              }}
+            >
+              <RotateCcw size={12} />
+            </button>
+          )}
         </td>
       </tr>
 
       {expanded && (
         <tr style={{ background: 'var(--surface)' }}>
-          <td colSpan={showTask ? 7 : 6} style={{ padding: '0 12px 12px 40px' }}>
-            {run.output && (
-              <pre style={{
-                margin: '8px 0 4px', padding: '10px 12px',
-                background: 'var(--surface-2)', borderRadius: 6,
-                fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)',
-                whiteSpace: 'pre-wrap', overflowWrap: 'break-word',
-              }}>{run.output}</pre>
-            )}
-            {run.error && (
-              <pre style={{
-                margin: '4px 0', padding: '10px 12px',
-                background: 'rgba(224,84,84,0.1)', borderRadius: 6,
-                border: '1px solid rgba(224,84,84,0.3)',
-                fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--error)',
-                whiteSpace: 'pre-wrap', overflowWrap: 'break-word',
-              }}>{run.error}</pre>
+          <td colSpan={showTask ? 8 : 7} style={{ padding: 0 }}>
+            {/* Structured execution timeline (if events available) */}
+            {run.events && run.events.length > 0 ? (
+              <ExecutionTimeline events={run.events} />
+            ) : (
+              /* Fallback: plain output + error */
+              <div style={{ padding: '8px 12px 12px 40px' }}>
+                {run.output && (
+                  <pre style={{
+                    margin: '8px 0 4px', padding: '10px 12px',
+                    background: 'var(--surface-2)', borderRadius: 6,
+                    fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)',
+                    whiteSpace: 'pre-wrap', overflowWrap: 'break-word',
+                  }}>{run.output}</pre>
+                )}
+                {run.error && (
+                  <pre style={{
+                    margin: '4px 0', padding: '10px 12px',
+                    background: 'rgba(224,84,84,0.1)', borderRadius: 6,
+                    border: '1px solid rgba(224,84,84,0.3)',
+                    fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--error)',
+                    whiteSpace: 'pre-wrap', overflowWrap: 'break-word',
+                  }}>{run.error}</pre>
+                )}
+                {!run.output && !run.error && (
+                  <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>No output recorded.</p>
+                )}
+              </div>
             )}
           </td>
         </tr>
@@ -74,7 +118,7 @@ function RunRow({ run, expanded, onToggle, showTask }) {
   )
 }
 
-export default function RunTable({ runs = [], showTask = false }) {
+export default function RunTable({ runs = [], showTask = false, onRetry }) {
   const [expanded, setExpanded] = useState(null)
 
   if (!runs.length) return (
@@ -100,6 +144,7 @@ export default function RunTable({ runs = [], showTask = false }) {
           <th style={th}>Started</th>
           <th style={th}>Duration</th>
           <th style={th}>Output</th>
+          <th style={th} />
         </tr>
       </thead>
       <tbody>
@@ -110,6 +155,7 @@ export default function RunTable({ runs = [], showTask = false }) {
             expanded={expanded === run.id}
             onToggle={setExpanded}
             showTask={showTask}
+            onRetry={onRetry}
           />
         ))}
       </tbody>

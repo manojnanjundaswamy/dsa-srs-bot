@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Loader2, RefreshCw } from 'lucide-react'
-import { getTasks, getSchedulerStatus, getAllRuns } from '../api/client'
+import { ArrowRight, Loader2 } from 'lucide-react'
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { getTasks, getSchedulerStatus, getAllRuns, getRunsSummary } from '../api/client'
 import StatCard from '../components/StatCard'
 import TypeBadge from '../components/TypeBadge'
 import StatusBadge from '../components/StatusBadge'
@@ -39,6 +40,12 @@ export default function Dashboard() {
     queryKey: ['all-runs'],
     queryFn: () => getAllRuns({ limit: 20 }),
     refetchInterval: 10_000,
+  })
+
+  const { data: runsSummary } = useQuery({
+    queryKey: ['runs-summary'],
+    queryFn: () => getRunsSummary(7),
+    refetchInterval: 60_000,
   })
 
   // Build a task map for quick name lookups in run rows
@@ -199,6 +206,64 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          {/* Analytics charts */}
+          {runsSummary && (
+            <div style={{ marginTop: 24 }}>
+              <h2 style={{ fontFamily: 'var(--font-head)', fontWeight: 600, fontSize: 16, margin: '0 0 14px', color: 'var(--text)' }}>
+                7-Day Run Activity
+              </h2>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                {/* Success / failed stacked bar chart */}
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '16px 20px' }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, fontWeight: 600 }}>
+                    Runs per day
+                  </div>
+                  <ResponsiveContainer width="100%" height={120}>
+                    <BarChart data={runsSummary.days.map((d, i) => ({
+                      date: d.slice(5), // MM-DD
+                      success: runsSummary.success[i],
+                      failed: runsSummary.failed[i],
+                    }))}>
+                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
+                      <Tooltip
+                        contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
+                        labelStyle={{ color: 'var(--text)' }}
+                        cursor={{ fill: 'var(--accent-dim)' }}
+                      />
+                      <Bar dataKey="success" fill="var(--success)" radius={[2, 2, 0, 0]} name="Success" stackId="a" />
+                      <Bar dataKey="failed"  fill="var(--error)"   radius={[2, 2, 0, 0]} name="Failed"  stackId="a" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Per-task avg duration */}
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '16px 20px' }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, fontWeight: 600 }}>
+                    Avg duration per task (ms)
+                  </div>
+                  {!runsSummary.task_durations?.length ? (
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '32px 0', textAlign: 'center' }}>Not enough data yet.</p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={120}>
+                      <BarChart data={runsSummary.task_durations.map(t => ({
+                        name: t.task_name.length > 14 ? t.task_name.slice(0, 14) + '…' : t.task_name,
+                        avg: t.avg_ms,
+                      }))}>
+                        <XAxis dataKey="name" tick={{ fontSize: 9, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
+                        <Tooltip
+                          contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
+                          formatter={(v) => [`${v}ms`, 'Avg']}
+                          cursor={{ fill: 'var(--accent-dim)' }}
+                        />
+                        <Bar dataKey="avg" fill="var(--running)" radius={[2, 2, 0, 0]} name="Avg ms" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 

@@ -43,6 +43,8 @@ def _migrate_sqlite():
             ("assets", "description",   "TEXT",          "''"),
             ("assets", "record_schema", "TEXT",          "'{}'"),
             ("assets", "updated_at",    "DATETIME",      "NULL"),
+            # task_runs table — structured execution events
+            ("task_runs", "events",     "TEXT",          "'[]'"),
         ]
 
         for table, col, col_type, default in pending:

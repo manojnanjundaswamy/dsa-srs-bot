@@ -1,5 +1,24 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Clock, Timer, Webhook, Play } from 'lucide-react'
+import cronstrue from 'cronstrue'
+import { CronExpressionParser } from 'cron-parser'
+
+function getCronPreview(expr) {
+  if (!expr || expr.trim().split(/\s+/).length < 5) return null
+  try {
+    const description = cronstrue.toString(expr, { throwExceptionOnParseError: true })
+    const interval = CronExpressionParser.parse(expr, { tz: 'Asia/Kolkata' })
+    const next = []
+    for (let i = 0; i < 4; i++) {
+      next.push(interval.next().toDate().toLocaleString('en-IN', {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', weekday: 'short',
+      }))
+    }
+    return { description, next }
+  } catch (_) {
+    return null
+  }
+}
 
 const CRON_PRESETS = [
   { label: 'Daily 7 AM (IST)',  value: '0 7 * * *' },
@@ -129,6 +148,28 @@ export default function TriggerBuilder({ type, config, onChange, onTypeChange })
               <option key={tz} value={tz}>{tz}</option>
             ))}
           </select>
+
+          {/* Cron preview */}
+          {(() => {
+            const preview = getCronPreview(config?.cron)
+            if (!preview) return null
+            return (
+              <div style={{
+                background: 'var(--accent-dim)', border: '1px solid rgba(232,160,48,0.25)',
+                borderRadius: 6, padding: '10px 12px', fontSize: 12,
+              }}>
+                <div style={{ color: 'var(--accent)', fontWeight: 600, marginBottom: 6 }}>
+                  {preview.description}
+                </div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Next 4 runs:</div>
+                {preview.next.map((t, i) => (
+                  <div key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)', marginTop: 2 }}>
+                    {i + 1}. {t}
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
         </div>
       )}
 

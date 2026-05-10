@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Pencil, Play, Copy, Trash2, ChevronLeft, Loader2 } from 'lucide-react'
+import { Pencil, Play, Copy, Trash2, ChevronLeft, Loader2, Radio } from 'lucide-react'
 import { getTask, getTaskRuns, runTask, enableTask, disableTask, duplicateTask, deleteTask } from '../api/client'
 import TypeBadge from '../components/TypeBadge'
 import StatusBadge from '../components/StatusBadge'
 import ScriptEditor from '../components/ScriptEditor'
 import RunTable from '../components/RunTable'
+import ExecutionTimeline from '../components/ExecutionTimeline'
 import { useToast } from '../components/Toast'
 
 function fmtDate(iso) {
@@ -26,6 +27,10 @@ export default function TaskDetail() {
   const qc = useQueryClient()
   const toast = useToast()
   const [running, setRunning] = useState(false)
+  const [liveRunId, setLiveRunId] = useState(null)
+  const [liveEvents, setLiveEvents] = useState([])
+  const [liveStatus, setLiveStatus] = useState('running')
+  const sseRef = useRef(null)
 
   const { data: task, isLoading } = useQuery({ queryKey: ['task', id], queryFn: () => getTask(id) })
   const { data: runs = [], refetch: refetchRuns } = useQuery({
@@ -34,6 +39,46 @@ export default function TaskDetail() {
     enabled: !!id,
     refetchInterval: 10_000,
   })
+
+  // Live SSE streaming for running tasks
+  const startLiveStream = (runId) => {
+    if (sseRef.current) sseRef.current.close()
+    setLiveRunId(runId)
+    setLiveEvents([])
+    setLiveStatus('running')
+
+    const es = new EventSource(`/api/runs/${runId}/stream`)
+    sseRef.current = es
+
+    es.addEventListener('log', (e) => {
+      try {
+        const ev = JSON.parse(e.data)
+        setLiveEvents(prev => [...prev, ev])
+      } catch (_) {}
+    })
+
+    es.addEventListener('status', (e) => {
+      try {
+        const d = JSON.parse(e.data)
+        setLiveStatus(d.status)
+      } catch (_) {}
+    })
+
+    es.addEventListener('done', (e) => {
+      try {
+        const d = JSON.parse(e.data)
+        setLiveStatus(d.status)
+      } catch (_) {}
+      es.close()
+      sseRef.current = null
+      setTimeout(() => { refetchRuns(); qc_inv() }, 500)
+    })
+
+    es.onerror = () => { es.close(); sseRef.current = null }
+  }
+
+  // Cleanup on unmount
+  useEffect(() => () => { if (sseRef.current) sseRef.current.close() }, [])
 
   const qc_inv = () => {
     qc.invalidateQueries({ queryKey: ['task', id] })
@@ -59,19 +104,22 @@ export default function TaskDetail() {
     onError: (e) => toast(e.message, 'error'),
   })
 
-  const handleRun = async () => {
+  const handleRun = async (taskIdOverride) => {
+    const tid = taskIdOverride || id
     setRunning(true)
     try {
-      const run = await runTask(id)
-      refetchRuns()
-      qc_inv()
-      toast(`Run ${run.status}`, run.status === 'success' ? 'success' : 'error')
+      const run = await runTask(tid)
+      // Start SSE stream to show live events
+      startLiveStream(run.id)
+      toast('Task running — live logs below', 'info')
     } catch (e) {
       toast(e.message, 'error')
-    } finally {
       setRunning(false)
     }
+    setRunning(false)
   }
+
+  const handleRetry = (taskId) => handleRun(taskId)
 
   if (isLoading) return (
     <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 80, color: 'var(--text-muted)' }}>
@@ -112,7 +160,7 @@ export default function TaskDetail() {
         </div>
         {/* Actions */}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <button onClick={handleRun} disabled={running} style={btnStyle('var(--success)')}>
+          <button onClick={() => handleRun()} disabled={running} style={btnStyle('var(--success)')}>
             {running ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={13} />}
             Run Now
           </button>
@@ -189,6 +237,31 @@ export default function TaskDetail() {
         </div>
       </div>
 
+      {/* Live run panel — shown while SSE stream is active */}
+      {liveRunId && (
+        <div style={{
+          background: 'var(--surface)', border: `1px solid ${liveStatus === 'running' ? 'var(--running)' : liveStatus === 'success' ? 'var(--success)' : 'var(--error)'}`,
+          borderRadius: 8, marginBottom: 20, overflow: 'hidden',
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '10px 16px', borderBottom: '1px solid var(--border)',
+          }}>
+            <Radio size={14} color="var(--running)" style={{ animation: liveStatus === 'running' ? 'pulse 1.4s infinite' : 'none' }} />
+            <span style={{ fontSize: 13, fontWeight: 500 }}>
+              {liveStatus === 'running' ? 'Task running — live output' : `Task ${liveStatus}`}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto', fontFamily: 'var(--font-mono)' }}>
+              {liveEvents.length} event{liveEvents.length !== 1 ? 's' : ''}
+            </span>
+            <button onClick={() => setLiveRunId(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>
+              Dismiss
+            </button>
+          </div>
+          <ExecutionTimeline events={liveEvents} />
+        </div>
+      )}
+
       {/* Run history */}
       <div>
         <h2 style={{ fontFamily: 'var(--font-head)', fontWeight: 600, fontSize: 17, color: 'var(--text)', margin: '0 0 12px' }}>
@@ -198,7 +271,7 @@ export default function TaskDetail() {
           </span>
         </h2>
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-          <RunTable runs={runs} />
+          <RunTable runs={runs} onRetry={handleRetry} />
         </div>
       </div>
 

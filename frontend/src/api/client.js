@@ -34,3 +34,6 @@ export const getRun      = (id)          => req(`${BASE}/runs/${id}`)
 // Scheduler
 export const getSchedulerStatus = () => req(`${BASE}/scheduler/status`)
 export const reloadScheduler    = () => req(`${BASE}/scheduler/reload`, { method: 'POST' })
+
+// Analytics
+export const getRunsSummary = (days = 7) => req(`${BASE}/analytics/runs-summary?days=${days}`)
